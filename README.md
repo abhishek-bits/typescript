@@ -782,7 +782,7 @@ if(firstName === secondName) { // No Overlap error
 }
 ```
 
-### Narrowing
+## Narrowing
 
 Take a look at the below method:
 
@@ -804,7 +804,7 @@ function padLeft(padding: number | string, input: string): string {
 }
 ```
 
-#### `typeof` type guards
+### `typeof` type guards
 
 In TypeScript checking against a value returned by a `typeof` is a type guard. Here is a list of values returned by `typeof`:
 
@@ -837,7 +837,7 @@ function printAll(strs: string | string[] | null) {
 
 In order to handle such issues, we go for the next concept.
 
-#### Truthiness Narrowing
+### Truthiness Narrowing
 
 In JavaScript, `if` statements don't expect their conditionals to always have the type `boolean`. It uses the concept of "coerce"ing. Following expressions will "coerce" to `false`:
 
@@ -850,7 +850,7 @@ In JavaScript, `if` statements don't expect their conditionals to always have th
 
 Any other expression will "coerce" to `true`.
 
-##### Coercing values to Boolean
+#### Coercing values to Boolean
 
 - Using Boolean function: `Boolean("hello")`.
 - Using double-negation (`!!`) operator: `!!"hello"`.
@@ -884,8 +884,516 @@ function multiplyAll(
 
 In the above code, if the variable `values` belongs to either `undefined` or `null`, it will simply return, thereby safeguarding us from getting errors at run-time.
 
-#### `in` operator narrowing
+### `in` operator narrowing
 
 Determines if an object or its prototype chain has a property with the given name (or value). It automatically converts the given value to their corresponding types.
 
 
+### `instanceof` type guard
+
+Basically used to check if a given value is an "instance" of any type. Any value constructed with `new` keyword can be checked with `instanceof`.
+
+### Assignments
+
+The type of any value is governed based on the expression at the right-hand side. In the below code, the type of variable `x` will be `number | string`:
+
+```ts
+let x = Math.random() < 0.5 ? 10 : "Hello World";
+```
+
+**NOTE**:
+The only value we can assign to variable `x` at any later point in the program is either of `number | string` and compiler error will arrive if some other type is assigned. This means the type at the time of declaration of the variable is deemed final.
+
+### Control Flow Analysis
+
+The analysis of code based on reachability is called Control Flow Analysis. This means that the exact type of any variable at any point in the program is governed with respect to the:
+
+- value assignments
+- type-guards
+
+encountered in that flow.
+
+### Using type predicates
+
+Restricting the `type` a variable can have in a particular method.
+
+To define a user-defined type-guard, we simply need to define a function whose return type is a *type predicate*. In the below code snippet, `animal is Fish` is our *type predicate*.
+
+```ts
+function isFish(animal: Fish | Bird): animal is Fish {
+    return (animal as Fish).swim != undefined;
+}
+```
+
+Any time, `isFish` will be called with some variable, TypeScript will *narrow* that variable to that specific type.
+
+```ts
+function doAction(animal : Fish | Bird) {
+    if(isFish(animal)) {
+        animal.swim();
+    } else {
+        animal.fly();
+    }
+}
+```
+
+**NOTE**:
+Not only does TypeScript know that within the `if` block, animal is of type `Fish`. It also knows that within the else block, animal is not of type `Fish`, instead of type `Bird`.
+
+Another useful application of type predicate is to filter out values of type `Fish` from a list of `Fish | Bird`:
+
+```ts
+const zoo: (Fish | Bird)[] = [fish, fish, bird, fish, bird, bird];
+const fishes: Fish[] = zoo.filter(isFish);
+```
+
+### Discriminated Unions
+
+Lets us write *type-safe* TypeScript code.
+
+Each type (object) should have a common property that should help TypeScript to distinguish amongs the given types.
+
+```ts
+interface Circle {
+    kind: "circle",
+    radius: number
+}
+```
+
+```ts
+interface Square {
+    kind: "square",
+    length: number
+}
+```
+
+```ts
+type Shape = Circle | Square
+```
+
+Now, consider the below code snippet:
+
+```ts
+function getArea(shape: Shape) {
+    // Error! radius does not exist on type 'Shape'
+    return Math.PI * Math.pow(shape.radius, 2);
+}
+```
+
+Since, `radius` is not a common property in the *union* type `Shape`. TypeScript thinks that shape might be a `Square` which does not have property `radius`. In order to solve this issue, we narrow down the type using the common property `kind`.
+
+```ts
+function getArea(shape: Shape) {
+    switch(shape.kind) {
+        case "circle":
+            return Math.PI * Math.pow(shape.radius, 2);
+        case "square":
+            return Math.pow(shape.length, 2);
+    }
+}
+```
+
+### `never` type
+
+Used to cut down the options of a union, when we know that we have exhausted all the possibilities.
+
+## Functions
+
+### Function type expressions
+
+Functions in TypeScript are both functions (as in any programming language) and can be passed as an expression to a method argument.
+
+```ts
+function greeter(fn: (a: string) => void) {
+    fn("Hello World");
+}
+
+function printToConsole(s: string) {
+    console.log(s);
+}
+
+greeter(printToConsole);
+```
+
+We can also use *type aliasing* for a function type:
+
+```ts
+type GreetFunction = (a: string) => void;
+
+function greeter(fn: GreetFunction) {
+    // ...
+}
+```
+
+### Call Signatures
+
+In JavaScript, it is possible for functions to have properties as well. We can do so by writing a *call signature* in object type as shown:
+
+```ts
+type DescribableFunction = {
+    description: string,
+    (arg: number): boolean 
+}
+```
+
+```ts
+function doSomething(fn: DescribableFunction) {
+    console.log(fn.description + " returned " + fn(6));
+}
+
+function isGreaterThan3(arg: number): boolean {
+    return arg > 3;
+}
+
+isGreaterThan3.description = "Is greater than 3";
+
+doSomething(isGreaterThan3);
+```
+
+### Construct Signatures
+
+Such methods will initialize the object using the `new` keyword and return the created object hence are called constructors.
+
+### Generic Functions
+
+In TypeScript, generics are used when we want to describe a correspondence between two values. We do this by declaring a *type parameter* in the function signature:
+
+```ts
+function firstElement<T>(arr: T[]): T | undefined {
+    return arr[0];
+}
+```
+
+In such a case, the type was *automatically inferred* by TypeScript.
+
+We can also use multiple type parameters as well as shown:
+
+```ts
+function map<K, V>(arr: K[], fn: (n: K) => V): V[] {
+    return arr.map(fn);
+}
+```
+
+#### Constraints
+
+Limitting the kinds of types that a Generic type parameter can accept. We can do so by using `extends` keyword:
+
+```ts
+function longestArray<T extends { length: number }>(a: T, b: T): T {
+    if(a.length > b.length)
+        return a;
+    return b;
+}
+```
+
+The above method restricts that the type of the variable can only be the one which has the property called `length`.
+
+### Specifying type arguments
+
+Suppose we have a method as shown below:
+
+```ts
+function combine<T>(a: T[], b: T[]): T[] {
+    return a.concat(b);
+}
+```
+
+The method will work fine if both arguments are of same type. If we want to pass different type arguments, then we can do as follows:
+
+```ts
+const arr = combine<number | string>([1,2,3], ["ab", "cd"]);
+```
+
+### Guidelines for writing Good Generic Functions
+
+Having too many type parameters or using constraints where they aren’t needed can make inference less successful, frustrating callers of your function.
+
+#### 1. Push type parameters down
+
+When possible use the type parameter itself rather than constraining it.
+
+#### 2. Always use as few type parameters as possible.
+
+#### 3. Type parameters should always appear twice.
+
+Type parameters are for relating the types of multiple values. If a type parameter is only used once in the function signature, it’s not relating anything. **Either as a parameter or as an inferred return type, but should be used twice**.
+
+### Optional Parameters
+
+Any parameter can be marked as optional using `?:` operator:
+
+```ts
+function fun(x?: number) {
+    //
+}
+```
+
+**NOTE**: 
+Any unspecified (optional) parameters will by-default accept `undefined` (or `null`) as well.
+
+This is why in the method `fun`, x is actually of type `number | undefined`.
+
+#### Optional Parameters in Callbacks
+
+> **Rule**: When writing a function type for a callback, never write an optional parameter unless you intend to call the function without passing that argument.
+
+Optional parameters should always be avoided wherever possible.
+
+### Function Overloads
+
+In TypeScript, we can specify a function that can be called in different ways by writing *overload signatures*. To do this, write some number of function signatures (usually two or more), followed by the body of the function:
+
+```ts
+// Declarations
+function makeDate(timestamp: number): Date;
+function makeDate(day: number, month: number, year: number): Date;
+
+// Definition
+function makeDate(dayOrTimestamp: number, month?: number, year?: number): Date {
+    if(month && year) {
+        return new Date(dayOrTimestamp, month, year);
+    } else {
+        return new Date(dayOrTimestamp);
+    }
+}
+```
+
+```ts
+const d1 = makeDate(Date.now());
+const d2 = makeDate(13, 9, 2023);
+// Error!
+// Even though we wrote a function with 
+// two optional parameters after the required one, 
+// it can’t be called with two parameters!
+const d3 = makeDate(Date.now(), 324324);
+```
+
+**NOTE**:
+The signature of the *implementation* is not visible from the outside.
+
+#### Rules for writing Good Overloads
+
+##### 1. When writing an overloaded function, always have two or more overloads above the implementation of the function.
+
+##### 2. The implementation signature should be compatible with the overload signatures. 
+
+Following code snippets are all invalid:
+
+```ts
+function fn(x: boolean): void;
+function fn(x: string): void;
+
+// Argument Type Incompatibility error
+function fn(x: boolean) {
+
+}
+```
+
+```ts
+function fn(x: string): string;
+function fn(x: number): boolean;
+
+// Return Type Incompatibility error
+function fn(x: string | number) {
+    return "oops";
+}
+```
+
+##### 3. Always prefer parameters with union types instead of overloads whenever possible.
+
+Consider the below method:
+
+```ts
+function len(s: string): number;
+function len(arr: any[]): number;
+
+function len(x: any) {
+    return x.length;
+}
+
+len("") // OK
+len([0]) // OK
+len(Math.random() > 0.5 ? "hello" : [0]); // Error
+```
+
+The problem with this approach is that when `len` is called with either a `string` or `any[]`, the TypeScript understands the argument type. But if the argument type is not known at compile time, i.e. it might either be a `string` or an `array`, then TypeScript starts complaining. This is because **Typescript can only resolve a function call to a single overload**.
+
+For such a scenario, union types are always preferred:
+
+```ts
+// Can now be invoked with either array or string type.
+function len(x: len[] | string) {
+    return x.length;
+}
+```
+
+#### Declaring `this` in a Function
+
+TypeScript automatically infers what `this` should be in a function via *Code Flow Analysis*. Consider the below code snippet:
+
+```ts
+const user = {
+    id: 123,
+    admin: false;
+
+    becomeAdmin: function() {
+        this.admin = true;
+    }
+}
+```
+
+In this case, TypeScript understands that the function `user.becomeAdmin` has a corresponding `this` which is the outer object `user`.
+
+Sometime, we want to want more control over what object `this` represents. **TypeScript lets us declare the type for `this` in the function body.**
+
+Additionally, we need to use `function` instead of arrow functions to achieve this behavior:
+
+```ts
+interface DB {
+    // Declaring the type for this.
+    filterUsers(filter: (this: User) => boolean): User[];
+}
+
+const db = getDB();
+
+// OK!
+const admins = db.filterUsers(function (this: User)) {
+    return this.admin;
+}
+
+// Arrow functions are not useful in this case
+const admins = db.filterUser(() => this.admin);
+```
+
+### Other Types to know about
+
+#### `void`
+
+- In TypeScript, `void` is the inferred type when a function doesn't have any return statements.
+- This will return `undefined` in JavaScript but `void` and `undefined` are **different** for TypeScript.
+
+#### `object`
+
+- Refers to any value that isn't a primitive. - Different from `{}` (empty object type).
+- Different from `Object` (global type).
+- In TypeScript, function types are considered to be `object`s.
+
+#### `unknown`
+
+Similar to but safer than `any`.
+
+#### `never`
+
+- Represents values which are *never* observed.
+- If used as a method's return type, would mean that the function throws an exception.
+- It also appears when TypeScript infers that all expected `union` types are now exhausted. (if-else / switch case).
+
+#### `Function`
+
+Generally best avoided.
+
+### Rest Parameters and Arguments
+
+#### Rest Parameters
+
+A function can accept an *unbounded* number of arguments. This is done using Rest parameters as shown:
+
+```ts
+function multiply(n: number, ...m: number[]): number[] {
+    return m.map((x) => n * x);
+}
+```
+
+A Rest Parameter should always be of array type: `Array<T>` or `T[]`.
+
+#### Rest Arguments
+
+We can provide a variable number of arguments from an *iterable* object. Since, the `push` method of array can take unbounded arguments, we can do:
+
+```ts
+const arr1 = [1,2,3];
+const arr2 = [4,5];
+arr1.push(...arr2);
+```
+
+However, if a method does not accept a Rest Parameter, then we need to apply `as const` suffix to our declared variable to convert it into a `tuple`.
+
+```ts
+// Inferred as a 2-length tuple.
+const args = [3,5] as const;
+const angle = Math.atan2(...args);
+```
+
+**NOTE**:
+The tuple (`Array<T>`) is this case, should have exactly the same number of values as expected in the called method.
+
+### Parameter Destructuring
+
+Conveniently unpack objects provided as an argument into one or more local objects in the function body. The type annotation for the object goes after the destructuring syntax:
+
+```ts
+function sum({a, b, c}: {a: number, b: number, c: number}) {
+    console.log(a + b + c);
+}
+```
+
+We can also have a named type here as well:
+
+```ts
+type ABC = {a: number, b: number, c: number};
+function sum({a, b, c}: ABC) {
+    console.log(a + b + c);
+}
+```
+
+### Unusual behavior with `void` 
+
+> A void-returning callback type says "I'm not going to look at your return value, if one exists".
+
+Ref: [why-are-functions-returning-non-void-assignable-to-functions-returning-void](https://github.com/Microsoft/TypeScript/wiki/FAQ#why-are-functions-returning-non-void-assignable-to-function-returning-void)
+
+*Contextual typing* with a return type of void **does not force** functions to not return something. Another way to say this is a contextual function type with a `void` return type (`type voidFunc = () => void`), when implemented, **can return any other value, but it will be ignored**.
+
+```ts
+type voidFunction = () => void;
+```
+
+This contextual function can be implemented in any of the below ways and all of them are valid.
+
+```ts
+const f1: voidFunction = () => {
+    return true;
+};
+
+const f2: voidFunction = () => true;
+
+const f3: voidFunction = function() {
+    return true;
+};
+```
+
+Moreover, all of the variables `f1`, `f2`, `f3` will have the return type of `void`.
+
+This behaviour exists to support situations like these:
+
+```ts
+const src = [1,2,3];
+const des = [0];
+
+src.forEach((item) => des.push(item));
+```
+
+Here, `push` method returns a `number` type while `forEach` method expects a function of return type `void`. But, the code works fine.
+
+Additionally, if a literal function definition has a `void` return type, then it must not return anything.
+
+```ts
+function f4(): void {
+    // Error!
+    return true;
+}
+```
+
+## Other
+
+- [GitHub: TypeScript FAQ by Microsoft](https://github.com/Microsoft/TypeScript/wiki/FAQ)
